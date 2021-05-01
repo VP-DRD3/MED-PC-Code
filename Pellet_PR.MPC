@@ -1,0 +1,150 @@
+\Left Nose Poke for 20mg food pellet
+\Written by Horia Pribiag (based on a Paul J Kenny drug self-admin program)
+\Date MAY 9, 2016
+
+\This section is for inputs
+^LeftPoke = 1
+^RightPoke = 2
+
+\This section is for outputs
+^Fan = 8 \ This is the Fan
+^HouseLight = 7 \ This is the house light
+^Reward = 3   \ In this code, this is a Food Pellet Dispenser
+^Sound = 5  \ In this code, this is a Sonalert
+
+\DEFINED VARIABLES
+\A = NUMBER OF ACTIVE Nose Pokes
+\B = NUMBER OF INACTIVE Nose Pokes
+\C = NUMBER of Rewards obtained
+\D = Sound cue timer (sec)
+\E = DATA ARRAY OF ACTIVE Nose Pokes (i.e. time stamp for each active nose poke)
+\F = DATA ARRAY OF INACTIVE Nose Pokes (i.e. time stamp for each inactive nose poke)
+\G = DATA ARRAY OF REWARDS delivered (i.e. time stamp for each reward delivered)
+\H = # of active poke responses required to deliver next reward
+\I = NMBER of Rewards obtained (for delivery logic)
+\N = SESSION TIMER (sec)
+\O = Reward Timer (sec)
+\Q = MAXIMUM REWARD
+\W() = Progressive ratio list
+\X = # of responses accumulated since previous reward delivery
+
+
+VAR_ALIAS Maximum reward (pellets) = Q
+VAR_ALIAS Sound Cue Duration (sec) = L
+
+DIM E = 250
+DIM F = 250
+DIM G = 250
+
+
+LIST W = 2,3,5,6,8,10,12,15,18,22,26,31,36,43,51,60,70,82,96,112,131,
+         153,178,208,243,282,329,383,446,518,603,701,816,948,1103,1282,1490
+
+
+
+\ Z-PULSES USED IN THIS PROGRAM
+\ Z1 = INActivation of Cue-light after schedule completion.
+\ Z3 = End of Session Signal.
+
+
+\***********************************************************************************************************************
+\Main control logic for Poke Light control, Z pulse for reward delivery, and timeout period after completion of schedule
+\***********************************************************************************************************************
+S.S.1,
+
+S1,
+  0.001": SET X = 0; SET H=W(0); SET Q = 100; SET L = 0.5 ---> S2
+
+S2,
+  #START: ON ^Fan ---> S3
+
+S3,
+  #R^RightPoke: ADD X;
+  IF (X >= H) [@True, @False]
+        @True: ON ^RightPoke; ADD I; Z1; SET X=0; SET H=W(I) ---> S4
+        @False: ---> S3
+
+S4,
+  10": OFF ^RightPoke ---> S3
+  #Z3: ---> S1
+
+\*******************************************************************************************
+\This is the state set that contains the response count and display of the ACTIVE NosePoke
+\*******************************************************************************************
+S.S.2,
+S1,
+  #START: SHOW 2,ActivePokes,A ---> S2
+
+S2,
+  #R^RightPoke: ADD A; SET E(A) = N; SHOW 2,ActivePokes,A ---> SX
+  #Z3: ---> S1
+
+
+\*******************************************************************************************
+\This is the state set that contains the response count and display of the INACTIVE NosePoke
+\*******************************************************************************************
+S.S.3,
+S1,
+  #START: SHOW 3,InactivePokes,B ---> S2
+
+S2,
+  #R^LeftPoke: ADD B; SET F(B) = N; SHOW 3,InactivePokes,B ---> SX
+  #Z3: ---> S1
+
+
+\*******************************************************************************************
+\Main control logic for delivery of Reward after completion of schedule
+\*******************************************************************************************
+S.S.4,
+S1,
+  #Z1: ON ^Reward ---> S2
+
+S2,
+  0.01": OFF ^Reward ---> S1
+  #Z3: ---> S1
+
+\*******************************************************************************************
+\Main control logic for Sound Cue after completion of schedule
+\*******************************************************************************************
+S.S.5,
+S1,
+  #Z1: ON ^Sound ---> S2
+
+S2,
+  0.01": SET D = D + 0.01;
+      IF (D >= L) [@True, @False]
+        @True: OFF ^Sound; SET D = 0 ---> S1
+        @False: ---> S2
+  #Z3: ---> S1
+
+\*******************************************************************************************
+\Reward counter
+\*******************************************************************************************
+S.S.6,
+S1,
+  #START: SHOW 4,REWARD,C ---> S2
+
+S2,
+  #Z1: ADD C; SET G(C) = N ; SET O=0; SHOW 4,REWARD,C ---> SX
+  #Z3: ---> S1
+
+
+\*******************************************************************************************
+\Session Timer
+\*******************************************************************************************
+S.S.7,
+S1,
+  #START: SHOW 1,Time_min,N/60 ---> S2
+
+S2,
+  1": ADD N; ADD O;  SHOW 1, Time_min,N/60; SHOW 5, T_Remain(min),(600-O)/60;
+      IF (N-G(C) >= 600) OR (C >= Q) [@True, @False]
+        @True: Z3 ---> S3
+        @False: ---> SX
+
+S3,
+  0.01": OFF ^HouseLight ---> S4
+
+S4,
+  3": OFF ^LeftPoke, ^RightPoke ---> STOPABORTFLUSH
+

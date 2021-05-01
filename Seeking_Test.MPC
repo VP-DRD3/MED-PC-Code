@@ -1,0 +1,87 @@
+\Right Nose Poke for Drug Delivery via Pump
+\Written by Horia Pribiag (based on a Paul J Kenny drug self-admin program)
+\Date MAY 9, 2016
+
+\This section is for inputs
+^LeftPoke = 1
+^RightPoke = 2
+
+\This section is for outputs
+^Fan = 8 \ This is the Fan
+^HouseLight = 7 \ This is the house light
+^Reward = 6   \ In this code, this is a Pump
+
+\DEFINED VARIABLES
+\A = NUMBER OF ACTIVE Nose Pokes
+\B = NUMBER OF INACTIVE Nose Pokes
+\E = DATA ARRAY OF ACTIVE Nose Pokes (i.e. time stamp for each active nose poke)
+\F = DATA ARRAY OF INACTIVE Nose Pokes (i.e. time stamp for each inactive nose poke)
+\M = SESSION DURATION (min)
+\N = SESSION TIMER (sec)
+
+VAR_ALIAS Session duration (min) = M
+
+DIM E = 250
+DIM F = 250
+
+\ Z-PULSES USED IN THIS PROGRAM
+\ Z3 = End of Session Signal.
+
+
+\**************
+\Initialization
+\**************
+S.S.1,
+S1,
+  0.001": SET M = 120 ---> S2
+
+S2,
+  #START: ON ^Fan, ^Reward ---> S3
+
+S3,
+  4": OFF ^Reward ---> SX
+  #Z3: ---> S1
+
+\*******************************************************************************************
+\This is the state set that contains the response count and display of the ACTIVE NosePoke
+\*******************************************************************************************
+S.S.2,
+S1,
+  #START: SHOW 2,ActivePokes,A ---> S2
+
+S2,
+  #R^RightPoke: ADD A; SET E(A) = N; SHOW 2,ActivePokes,A ---> SX
+  #Z3: ---> S1
+
+
+\*******************************************************************************************
+\This is the state set that contains the response count and display of the INACTIVE NosePoke
+\*******************************************************************************************
+S.S.3,
+S1,
+  #START: SHOW 3,InactivePokes,B ---> S2
+
+S2,
+  #R^LeftPoke: ADD B; SET F(B) = N; SHOW 3,InactivePokes,B ---> SX
+  #Z3: ---> S1
+
+
+\*******************************************************************************************
+\Session Timer
+\*******************************************************************************************
+S.S.4,
+S1,
+  #START: SHOW 1,Time_min,N/60 ---> S2
+
+S2,
+  1": ADD N; SHOW 1, Time_min,N/60;
+      IF (N/60 >= M) [@True, @False]
+        @True: Z3 ---> S3
+        @False: ---> SX
+
+S3,
+  0.01": OFF ^HouseLight ---> S4
+
+S4,
+  3": OFF ^LeftPoke, ^RightPoke ---> STOPABORTFLUSH
+
